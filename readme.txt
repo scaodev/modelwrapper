@@ -1,0 +1,1 @@
+I'm working on a project which need separate ui model and domain model(which belongs to 3rd party provider). and UI model need to be immutable and utilize builder pattern. since there are hundreds of domain model java classes so I decide write a groovy script to do the job. side goal is polish my groovy skill since i haven't use if for years.
