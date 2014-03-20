@@ -1,6 +1,8 @@
 package org.scao.samplejava;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Date: 3/16/14
@@ -10,13 +12,23 @@ public class Person {
     private String firstName;
     private String lastName;
     private List<String> titles;
-    private List<String> jobs;
+    private String[] jobs;
+    Map<String, Double> locations;
+    Set<String> skills;
 
-    public List<String> getJobs() {
+    public Set<String> getSkills() {
+        return skills;
+    }
+
+    public void setSkills(Set<String> skills) {
+        this.skills = skills;
+    }
+
+    public String[] getJobs() {
         return jobs;
     }
 
-    public void setJobs(List<String> jobs) {
+    public void setJobs(String[] jobs) {
         this.jobs = jobs;
     }
 
@@ -42,5 +54,13 @@ public class Person {
 
     public void setTitles(List<String> titles) {
         this.titles = titles;
+    }
+
+    public Map<String, Double> getLocations() {
+        return locations;
+    }
+
+    public void setLocations(Map<String, Double> locations) {
+        this.locations = locations;
     }
 }

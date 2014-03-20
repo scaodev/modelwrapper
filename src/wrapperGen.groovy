@@ -71,12 +71,9 @@ def processClass(Class clazz, p) {
                 privateWrapFields: [[type: clazz.name, name: currentFieldName]], imports: imports]
 
   BeanInfo beanInfo = Introspector.getBeanInfo(clazz)
+
   beanInfo.methodDescriptors.each { md ->
     Method method = md.method
-
-
-
-
     if ((method.name.startsWith("get") && method.name != 'getClass') || method.name.startsWith("is")) {
       Class retType = method.returnType;
       Map methodAnalystResult = genMethodRetTypeInStr(clazz, method.name, p)
@@ -104,14 +101,28 @@ def genMethodRetTypeInStr(Class clazz, String methodName, String currentPackage)
   }
   Field field = clazz.getDeclaredField(fieldName)
   String fieldTypeLong = field.type.name
-  if (isListType(field)) {
+  if (hasOneGenericType(field)) {
     ParameterizedType type = (ParameterizedType) field.getGenericType()
     //actualTypeArguments list all generic type parameters
     return [retType: "${field.type.simpleName}<${getTypeSimpleName(type.actualTypeArguments[0])}>", imports: [fieldTypeLong]]
-  } else if (fieldTypeLong.startsWith("java.lang") || fieldTypeLong.startsWith(currentPackage)) {
-    return [retType: field.type.simpleName, imports: []]
+  } else if (isMapType(field)) {
+    ParameterizedType type = (ParameterizedType) field.getGenericType()
+    return [retType: "${field.type.simpleName}<${getTypeSimpleName(type.actualTypeArguments[0])}, ${getTypeSimpleName(type.actualTypeArguments[1])}>",
+            imports: [fieldTypeLong]]
+  } else {
+    return [retType: field.type.simpleName, imports: findImports(fieldTypeLong, currentPackage)]
   }
 
+}
+
+def findImports(String fieldTypeLong, String currentPackage) {
+  //Array start with [ character
+  if (fieldTypeLong.startsWith("java.lang") || fieldTypeLong.startsWith(currentPackage) || fieldTypeLong.startsWith('[')) {
+    []
+  } else {
+    println("!!!${fieldTypeLong}")
+    [fieldTypeLong]
+  }
 }
 
 def getTypeSimpleName(Type type) {
@@ -120,9 +131,13 @@ def getTypeSimpleName(Type type) {
   s.substring(s.lastIndexOf(".") + 1)
 }
 
-def isListType(Field field) {
+def hasOneGenericType(Field field) {
   //check if is subClass of
-  return List.class.isAssignableFrom(field.getType())
+  return List.class.isAssignableFrom(field.getType()) || Set.class.isAssignableFrom(field.getType())
+}
+
+def isMapType(Field field) {
+  return Map.class.isAssignableFrom(field.getType())
 }
 
 
