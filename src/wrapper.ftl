@@ -22,7 +22,11 @@ public class ${className} <#if super??>extends ${super}</#if>{
 
     <#list getters as g>
     public ${g.retType} ${g.methodName}(){
-        return ${g.retInstance}.${g.retMethod}();
+        <#if g.wrapperType>
+        return new ${g.retType}(refVal.${g.retMethod}());
+        <#else>
+        return refVal.${g.retMethod}();
+        </#if>
     }
     </#list>
 }

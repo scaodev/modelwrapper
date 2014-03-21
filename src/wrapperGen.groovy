@@ -1,9 +1,6 @@
 #!/usr/bin/env groovy
-import freemarker.template.Configuration
-import freemarker.template.DefaultObjectWrapper
-import freemarker.template.Template
-import freemarker.template.TemplateExceptionHandler
-import freemarker.template.Version
+import freemarker.template.*
+import org.apache.commons.cli.Option
 
 //in intellij type alt+enter to import grab lib
 @Grab(group = 'org.freemarker', module = 'freemarker', version = '2.3.20')
@@ -13,12 +10,7 @@ def cli = new CliBuilder(
     usage: 'wrapperGen.groovy <-j pathToJar> <-c packagePath,classPath>'
 )
 
-import org.apache.commons.cli.Option
-
-import java.beans.BeanInfo
-import java.beans.Introspector
 import java.lang.reflect.Field
-import java.lang.reflect.Method
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.nio.file.FileSystems
@@ -28,8 +20,9 @@ cli.with {
   j(longOpt: 'jar', 'source jar file full path', args: 1, required: true)
   b(longOpt: 'base', 'target class package base', args: 1, required: false)
   t(longOpt: 'targetPath', 'target root folder write generated files to', args: 1, required: true)
-  c(longOpt: 'classes', 'package path or full path class name to generate', args: Option.UNLIMITED_VALUES, valueSeparator: ",", required: true)
   //this parameter accept multi value separate by comma
+  c(longOpt: 'classes', 'package path or full path class name to generate', args: Option.UNLIMITED_VALUES, valueSeparator: ",", required: true)
+  f(longOpt: 'force', 'force overwrite exist file', required: false)
 }
 
 def opt = cli.parse(args)
@@ -48,13 +41,18 @@ assert classes.size() > 0, "At least one full path class name or package name sh
 
 File basePath = makeTargetPath(opt.t, opt.b)
 
+if (opt.f) {
+  basePath.listFiles().each { file -> file.delete() }
+}
+
 classes.each { cn ->
   Class clazz = Class.forName(cn)
   generate(clazz, opt, basePath)
 }
 
 private void generate(Class<?> clazz, OptionAccessor opt, File basePath) {
-  def root = processClass(clazz, opt.b)
+  def root = processClass(clazz, opt.b, opt, basePath)
+  //todo refactor this, no necessary passing parameters which might not be used
 
   File outFile = new File(basePath, "${clazz.simpleName}.java")
 
@@ -69,25 +67,31 @@ private void generate(Class<?> clazz, OptionAccessor opt, File basePath) {
 }
 
 
-def processClass(Class clazz, p) {
+def processClass(Class clazz, p, opt, basePath) {
   def getters = []
   def imports = [] as HashSet
   def currentFieldName = "refVal"
+  def privateWrapFields = [[type: clazz.name, name: currentFieldName]]
+  def initFields = []
   Map retVal = [package          : p, className: genTargetClassName(clazz), sourceClass: clazz.name, getters: getters,
-                privateWrapFields: [[type: clazz.name, name: currentFieldName]], imports: imports]
+                privateWrapFields: privateWrapFields, imports: imports, initFields: initFields]
 
   //bean info return all methods including inherited from parent. but we don't need them here
   //BeanInfo beanInfo = Introspector.getBeanInfo(clazz)
   //beanInfo.methodDescriptors.each { md ->
   clazz.declaredMethods.each { method ->
     if ((method.name.startsWith("get") && method.name != 'getClass') || method.name.startsWith("is")) {
-      Class retType = method.returnType;
       Map methodAnalystResult = genMethodRetTypeInStr(clazz, method.name, p)
       imports.addAll(methodAnalystResult.imports)
 
-      def getter = [retType: methodAnalystResult.retType, methodName: method.name]
-      if (!retType.name.startsWith(clazz.package.name)) {
-        getter.put('retInstance', currentFieldName)
+      def getter = [retType: methodAnalystResult.retType, methodName: method.name,wrapperType:false]
+      if (methodAnalystResult.newField) {
+        getter.put('wrapperType', true)
+        getter.put('retMethod', method.name)
+        generate(methodAnalystResult.newFieldClass, opt, basePath)
+        initFields.add([name  : methodAnalystResult.retField, typeName: methodAnalystResult.newFieldClass.simpleName,
+                        getter: method.name])
+      } else {
         getter.put('retMethod', method.name)
       }
       getters.push(getter)
@@ -112,6 +116,8 @@ def genMethodRetTypeInStr(Class clazz, String methodName, String currentPackage)
   }
   Field field = clazz.getDeclaredField(fieldName)
   String fieldTypeLong = field.type.name
+
+
   if (hasOneGenericType(field)) {
     ParameterizedType type = (ParameterizedType) field.getGenericType()
     //actualTypeArguments list all generic type parameters
@@ -120,6 +126,8 @@ def genMethodRetTypeInStr(Class clazz, String methodName, String currentPackage)
     ParameterizedType type = (ParameterizedType) field.getGenericType()
     return [retType: "${field.type.simpleName}<${getTypeSimpleName(type.actualTypeArguments[0])}, ${getTypeSimpleName(type.actualTypeArguments[1])}>",
             imports: [fieldTypeLong]]
+  } else if (fieldTypeLong.startsWith(clazz.package.name)) {
+    return [retType      : field.type.simpleName, imports: [], newField: true, newFieldClass:field.type]
   } else {
     return [retType: field.type.simpleName, imports: findImports(fieldTypeLong, currentPackage)]
   }
@@ -131,7 +139,6 @@ def findImports(String fieldTypeLong, String currentPackage) {
   if (fieldTypeLong.startsWith("java.lang") || fieldTypeLong.startsWith(currentPackage) || fieldTypeLong.startsWith('[')) {
     []
   } else {
-    println("!!!${fieldTypeLong}")
     [fieldTypeLong]
   }
 }
