@@ -46,21 +46,27 @@ this.class.classLoader.rootLoader.addURL(new URL("file://${jarPath}"))
 
 assert classes.size() > 0, "At least one full path class name or package name should be specified."
 
-Class clazz = Class.forName(classes[0]);
-
-
 File basePath = makeTargetPath(opt.t, opt.b)
 
-def root = processClass(clazz, opt.b)
-
-File outFile = new File(basePath, "${clazz.simpleName}.java")
-
-if (outFile.exists()) {
-  //TODO promote if overwrite exist file
-} else {
-  outFile.createNewFile()
+classes.each { cn ->
+  Class clazz = Class.forName(cn)
+  generate(clazz, opt, basePath)
 }
-writeToOutput(root, new OutputStreamWriter(new FileOutputStream(outFile)))
+
+private void generate(Class<?> clazz, OptionAccessor opt, File basePath) {
+  def root = processClass(clazz, opt.b)
+
+  File outFile = new File(basePath, "${clazz.simpleName}.java")
+
+  if (outFile.exists()) {
+    println("${outFile.getName()} already exist. generate ignored")
+    return
+    //TODO promote if overwrite exist file
+  } else {
+    outFile.createNewFile()
+  }
+  writeToOutput(root, new OutputStreamWriter(new FileOutputStream(outFile)))
+}
 
 
 def processClass(Class clazz, p) {
@@ -70,10 +76,10 @@ def processClass(Class clazz, p) {
   Map retVal = [package          : p, className: genTargetClassName(clazz), sourceClass: clazz.name, getters: getters,
                 privateWrapFields: [[type: clazz.name, name: currentFieldName]], imports: imports]
 
-  BeanInfo beanInfo = Introspector.getBeanInfo(clazz)
-
-  beanInfo.methodDescriptors.each { md ->
-    Method method = md.method
+  //bean info return all methods including inherited from parent. but we don't need them here
+  //BeanInfo beanInfo = Introspector.getBeanInfo(clazz)
+  //beanInfo.methodDescriptors.each { md ->
+  clazz.declaredMethods.each { method ->
     if ((method.name.startsWith("get") && method.name != 'getClass') || method.name.startsWith("is")) {
       Class retType = method.returnType;
       Map methodAnalystResult = genMethodRetTypeInStr(clazz, method.name, p)
@@ -86,6 +92,11 @@ def processClass(Class clazz, p) {
       }
       getters.push(getter)
     }
+  }
+
+  Class superClass = clazz.superclass
+  if (superClass.simpleName != 'Object') {
+    retVal.put('super', superClass.simpleName)
   }
   return retVal
 }

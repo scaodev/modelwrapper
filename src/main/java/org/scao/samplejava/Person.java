@@ -1,6 +1,5 @@
 package org.scao.samplejava;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -11,7 +10,7 @@ import java.util.Set;
 public class Person {
     private String firstName;
     private String lastName;
-    private List<String> titles;
+  ;
     private String[] jobs;
     Map<String, Double> locations;
     Set<String> skills;
@@ -46,14 +45,6 @@ public class Person {
 
     public void setLastName(String lastName) {
         this.lastName = lastName;
-    }
-
-    public List<String> getTitles() {
-        return titles;
-    }
-
-    public void setTitles(List<String> titles) {
-        this.titles = titles;
     }
 
     public Map<String, Double> getLocations() {

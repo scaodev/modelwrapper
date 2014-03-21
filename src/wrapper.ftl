@@ -8,12 +8,15 @@ import ${i};
 this is a wrapper classes generated from ${sourceClass}
 */
 
-public class ${className}{
+public class ${className} <#if super??>extends ${super}</#if>{
     <#list privateWrapFields as pf>
     private final ${pf.type} ${pf.name};
     </#list>
 
-    private ${className} (${sourceClass} val){
+    public ${className} (${sourceClass} val){
+        <#if super??>
+        super(val);
+        </#if>
         this.refVal = val;
     }
 
