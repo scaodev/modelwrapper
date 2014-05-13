@@ -9,8 +9,9 @@ import java.util.List;
 public class Employee extends Person{
     private String dob;
     private List<String> titles;
-    /*private List<Address> addresses;*/
+    private List<Role> roles;
     private Address primaryAddress;
+
 
     public String getDob() {
         return dob;
@@ -28,13 +29,13 @@ public class Employee extends Person{
         this.titles = titles;
     }
 
-    /*public List<Address> getAddresses() {
-        return addresses;
+    public List<Role> getRoles() {
+        return roles;
     }
 
-    public void setAddresses(List<Address> addresses) {
-        this.addresses = addresses;
-    }*/
+    public void setRoles(List<Role> roles) {
+        this.roles = roles;
+    }
 
     public Address getPrimaryAddress() {
         return primaryAddress;

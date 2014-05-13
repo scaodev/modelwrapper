@@ -11,6 +11,7 @@ def cli = new CliBuilder(
 )
 
 import java.lang.reflect.Field
+import java.lang.reflect.Method
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.nio.file.FileSystems
@@ -51,7 +52,7 @@ classes.each { cn ->
 }
 
 private void generate(Class<?> clazz, OptionAccessor opt, File basePath) {
-  def root = processClass(clazz, opt.b, opt, basePath)
+  def root = analystClass(clazz, opt.b, opt, basePath)
   //todo refactor this, no necessary passing parameters which might not be used
 
   File outFile = new File(basePath, "${clazz.simpleName}.java")
@@ -67,7 +68,7 @@ private void generate(Class<?> clazz, OptionAccessor opt, File basePath) {
 }
 
 
-def processClass(Class clazz, p, opt, basePath) {
+def analystClass(Class clazz, p, opt, basePath) {
   def getters = []
   def imports = [] as HashSet
   def currentFieldName = "refVal"
@@ -80,13 +81,16 @@ def processClass(Class clazz, p, opt, basePath) {
   //BeanInfo beanInfo = Introspector.getBeanInfo(clazz)
   //beanInfo.methodDescriptors.each { md ->
   clazz.declaredMethods.each { method ->
-    if ((method.name.startsWith("get") && method.name != 'getClass') || method.name.startsWith("is")) {
-      Map methodAnalystResult = genMethodRetTypeInStr(clazz, method.name, p)
+    if (isBeanMethod(method)) {
+      Map methodAnalystResult = analystMethod(clazz, method.name, p)
       imports.addAll(methodAnalystResult.imports)
 
-      def getter = [retType: methodAnalystResult.retType, methodName: method.name,wrapperType:false]
-      if (methodAnalystResult.newField) {
-        getter.put('wrapperType', true)
+      def getter = [retType: methodAnalystResult.retType, methodName: method.name,wrapperType:'', fundamentalType: methodAnalystResult.fundamentalType ? true : false]
+      if (methodAnalystResult.newField != null) {
+        getter.put('wrapperType', methodAnalystResult.newField)
+        getter.put('sourceClass', methodAnalystResult.newFieldClass.name)
+        getter.put('genericTypes', methodAnalystResult.genericTypes)
+        getter.put('targetClass', methodAnalystResult.targetClass)
         getter.put('retMethod', method.name)
         generate(methodAnalystResult.newFieldClass, opt, basePath)
         initFields.add([name  : methodAnalystResult.retField, typeName: methodAnalystResult.newFieldClass.simpleName,
@@ -105,7 +109,11 @@ def processClass(Class clazz, p, opt, basePath) {
   return retVal
 }
 
-def genMethodRetTypeInStr(Class clazz, String methodName, String currentPackage) {
+private boolean isBeanMethod(Method method) {
+  (method.name.startsWith("get") && method.name != 'getClass') || method.name.startsWith("is")
+}
+
+def analystMethod(Class clazz, String methodName, String currentPackage) {
   String fieldName;
   if (methodName.startsWith('get')) {
     fieldName = methodName.substring(3, 4).toLowerCase() + methodName.substring(4, methodName.length())
@@ -121,15 +129,22 @@ def genMethodRetTypeInStr(Class clazz, String methodName, String currentPackage)
   if (hasOneGenericType(field)) {
     ParameterizedType type = (ParameterizedType) field.getGenericType()
     //actualTypeArguments list all generic type parameters
-    return [retType: "${field.type.simpleName}<${getTypeSimpleName(type.actualTypeArguments[0])}>", imports: [fieldTypeLong]]
+    def retVal = [retType: "${field.type.simpleName}<${getTypeSimpleName(type.actualTypeArguments[0])}>", imports: [fieldTypeLong]]
+    if (clazz.package.name.startsWith(getTypePackageName(type.actualTypeArguments[0]))) {
+      retVal.newField = 'list'
+      retVal.newFieldClass = Class.forName(getFullTypeClass(type.actualTypeArguments[0]))
+      retVal.genericTypes = ["${getTypeSimpleName(type.actualTypeArguments[0])}"]
+      retVal.targetClass = getTypeSimpleName(type.actualTypeArguments[0])
+    }
+    return retVal
   } else if (isMapType(field)) {
     ParameterizedType type = (ParameterizedType) field.getGenericType()
     return [retType: "${field.type.simpleName}<${getTypeSimpleName(type.actualTypeArguments[0])}, ${getTypeSimpleName(type.actualTypeArguments[1])}>",
             imports: [fieldTypeLong]]
   } else if (fieldTypeLong.startsWith(clazz.package.name)) {
-    return [retType      : field.type.simpleName, imports: [], newField: true, newFieldClass:field.type]
+    return [retType      : field.type.simpleName, imports: [], newField: 'ref', newFieldClass:field.type]
   } else {
-    return [retType: field.type.simpleName, imports: findImports(fieldTypeLong, currentPackage)]
+    return [retType: field.type.simpleName, imports: findImports(fieldTypeLong, currentPackage), fundamentalType:true]
   }
 
 }
@@ -147,6 +162,11 @@ def getTypeSimpleName(Type type) {
   //the type.toString suppose return 'class java.lang.String'
   String s = type.toString().split(' ')[1]
   s.substring(s.lastIndexOf(".") + 1)
+}
+
+def getTypePackageName(Type type) {
+  String s = type.toString().split(' ')[1]
+  s.substring(0, s.lastIndexOf('.'))
 }
 
 def hasOneGenericType(Field field) {
@@ -187,7 +207,7 @@ def writeToOutput(content, out) {
 // a good choice in most applications:
   cfg.setDefaultEncoding("UTF-8");
 
-// Sets how errors will appear. Here we assume we are developing HTML pages.
+// Sets how errors will appear. Here I assume we are developing HTML pages.
 // For production systems TemplateExceptionHandler.RETHROW_HANDLER is better.
   cfg.setTemplateExceptionHandler(TemplateExceptionHandler.HTML_DEBUG_HANDLER);
 
@@ -199,4 +219,8 @@ def writeToOutput(content, out) {
   Template template = cfg.getTemplate("wrapper.ftl")
 
   template.process(content, out);
+}
+
+String getFullTypeClass(Type type) {
+  type.toString().split(' ')[1]
 }

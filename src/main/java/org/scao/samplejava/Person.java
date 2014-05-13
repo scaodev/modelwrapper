@@ -10,7 +10,6 @@ import java.util.Set;
 public class Person {
     private String firstName;
     private String lastName;
-  ;
     private String[] jobs;
     Map<String, Double> locations;
     Set<String> skills;

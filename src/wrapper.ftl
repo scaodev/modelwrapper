@@ -22,10 +22,16 @@ public class ${className} <#if super??>extends ${super}</#if>{
 
     <#list getters as g>
     public ${g.retType} ${g.methodName}(){
-        <#if g.wrapperType>
-        return new ${g.retType}(refVal.${g.retMethod}());
-        <#else>
+        <#if "list" == g.wrapperType>
+        ${g.retType} retVal = new ArrayList<${g.targetClass}>();
+        for(${g.sourceClass} v : refVal.${g.retMethod}()){
+            retVal.add(new ${g.genericTypes[0]}(v));
+        }
+        return retVal;
+        <#elseif g.fundamentalType>
         return refVal.${g.retMethod}();
+        <#else>
+        return new ${g.retType}(refVal.${g.retMethod}());
         </#if>
     }
     </#list>
