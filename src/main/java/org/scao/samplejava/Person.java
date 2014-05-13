@@ -11,7 +11,7 @@ public class Person {
     private String firstName;
     private String lastName;
     private String[] jobs;
-    Map<String, Double> locations;
+    Map<String, Role> locations;
     Set<String> skills;
 
     public Set<String> getSkills() {
@@ -46,11 +46,11 @@ public class Person {
         this.lastName = lastName;
     }
 
-    public Map<String, Double> getLocations() {
+    public Map<String, Role> getLocations() {
         return locations;
     }
 
-    public void setLocations(Map<String, Double> locations) {
+    public void setLocations(Map<String, Role> locations) {
         this.locations = locations;
     }
 }

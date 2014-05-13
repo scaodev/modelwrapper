@@ -83,22 +83,16 @@ def analystClass(Class clazz, p, opt, basePath) {
   clazz.declaredMethods.each { method ->
     if (isBeanMethod(method)) {
       Map methodAnalystResult = analystMethod(clazz, method.name, p)
+      methodAnalystResult += [methodName: method.name, retMethod: method.name, sourceClass: methodAnalystResult.newFieldClass?.name]
+
       imports.addAll(methodAnalystResult.imports)
 
-      def getter = [retType: methodAnalystResult.retType, methodName: method.name,wrapperType:'', fundamentalType: methodAnalystResult.fundamentalType ? true : false]
-      if (methodAnalystResult.newField != null) {
-        getter.put('wrapperType', methodAnalystResult.newField)
-        getter.put('sourceClass', methodAnalystResult.newFieldClass.name)
-        getter.put('genericTypes', methodAnalystResult.genericTypes)
-        getter.put('targetClass', methodAnalystResult.targetClass)
-        getter.put('retMethod', method.name)
+      if (methodAnalystResult.genericTypeIsGenerated) {
         generate(methodAnalystResult.newFieldClass, opt, basePath)
         initFields.add([name  : methodAnalystResult.retField, typeName: methodAnalystResult.newFieldClass.simpleName,
                         getter: method.name])
-      } else {
-        getter.put('retMethod', method.name)
       }
-      getters.push(getter)
+      getters.push(methodAnalystResult)
     }
   }
 
@@ -125,28 +119,58 @@ def analystMethod(Class clazz, String methodName, String currentPackage) {
   Field field = clazz.getDeclaredField(fieldName)
   String fieldTypeLong = field.type.name
 
+  def retVal = [isCollection        : false, fundamentalType: false, genericTypeIsGenerated: false, imports: [], newField: 'ref',
+                internalRefFieldName: '_' + fieldName]
 
-  if (hasOneGenericType(field)) {
+  if (isOneGenericTypeCollection(field)) {
+    retVal.isCollection = true;
+
     ParameterizedType type = (ParameterizedType) field.getGenericType()
     //actualTypeArguments list all generic type parameters
-    def retVal = [retType: "${field.type.simpleName}<${getTypeSimpleName(type.actualTypeArguments[0])}>", imports: [fieldTypeLong]]
-    if (clazz.package.name.startsWith(getTypePackageName(type.actualTypeArguments[0]))) {
-      retVal.newField = 'list'
-      retVal.newFieldClass = Class.forName(getFullTypeClass(type.actualTypeArguments[0]))
-      retVal.genericTypes = ["${getTypeSimpleName(type.actualTypeArguments[0])}"]
-      retVal.targetClass = getTypeSimpleName(type.actualTypeArguments[0])
-    }
-    return retVal
-  } else if (isMapType(field)) {
-    ParameterizedType type = (ParameterizedType) field.getGenericType()
-    return [retType: "${field.type.simpleName}<${getTypeSimpleName(type.actualTypeArguments[0])}, ${getTypeSimpleName(type.actualTypeArguments[1])}>",
-            imports: [fieldTypeLong]]
-  } else if (fieldTypeLong.startsWith(clazz.package.name)) {
-    return [retType      : field.type.simpleName, imports: [], newField: 'ref', newFieldClass:field.type]
-  } else {
-    return [retType: field.type.simpleName, imports: findImports(fieldTypeLong, currentPackage), fundamentalType:true]
-  }
+    retVal.retType = "${field.type.simpleName}<${getTypeSimpleName(type.actualTypeArguments[0])}>"
+    retVal.imports = [fieldTypeLong];
 
+    if (field.type.simpleName.indexOf("List") != -1) {
+      retVal.imports.add('java.util.ArrayList')
+      retVal.collectionImplType = 'ArrayList'
+    } else {
+      retVal.imports.add('java.util.HashSet')
+      retVal.collectionImplType = 'HashSet'
+    }
+
+    retVal.newFieldClass = Class.forName(getFullTypeClass(type.actualTypeArguments[0]))
+    retVal.genericTypes = ["${getTypeSimpleName(type.actualTypeArguments[0])}"]
+    retVal.targetClass = getTypeSimpleName(type.actualTypeArguments[0])
+    retVal.genericTypeIsGenerated = genericTypeIsGenerated(clazz, type)
+  } else if (fieldTypeIsMap(field)) {
+    retVal.isCollection = true;
+    retVal.collectionImplType = 'HashMap'
+    ParameterizedType type = (ParameterizedType) field.getGenericType()
+
+    retVal += [retType                   : "${field.type.simpleName}<${getTypeSimpleName(type.actualTypeArguments[0])}, ${getTypeSimpleName(type.actualTypeArguments[1])}>",
+               imports                   : [fieldTypeLong, 'java.util.HashMap'], fundamentalType: false,
+               mapKeyType                : type.actualTypeArguments[0].simpleName,
+               mapKeyTypeIsGenerated     : isTypeGenerated(clazz, type.actualTypeArguments[0]),
+               mapKeyTypeSourceFullName  : type.actualTypeArguments[0].name,
+               mapValueType              : type.actualTypeArguments[1].simpleName,
+               mapValueTypeIsGenerated   : isTypeGenerated(clazz, type.actualTypeArguments[1]),
+               mapValueTypeSourceFullName: type.actualTypeArguments[1].name]
+
+  } else if (isTypeGenerated(clazz, field.type)) {
+    retVal += [retType: field.type.simpleName, newFieldClass: field.type, genericTypeIsGenerated: isTypeGenerated(clazz, field.type)]
+  } else {
+    retVal += [retType: field.type.simpleName, imports: findImports(fieldTypeLong, currentPackage), fundamentalType: true]
+  }
+  return retVal
+
+}
+
+private boolean genericTypeIsGenerated(Class clazz, ParameterizedType type) {
+  isTypeGenerated(clazz, type.actualTypeArguments[0])
+}
+
+private boolean isTypeGenerated(Class clazz, Type type) {
+  clazz.package.name.startsWith(getTypePackageName(type))
 }
 
 def findImports(String fieldTypeLong, String currentPackage) {
@@ -169,12 +193,12 @@ def getTypePackageName(Type type) {
   s.substring(0, s.lastIndexOf('.'))
 }
 
-def hasOneGenericType(Field field) {
+def isOneGenericTypeCollection(Field field) {
   //check if is subClass of
   return List.class.isAssignableFrom(field.getType()) || Set.class.isAssignableFrom(field.getType())
 }
 
-def isMapType(Field field) {
+def fieldTypeIsMap(Field field) {
   return Map.class.isAssignableFrom(field.getType())
 }
 

@@ -1,6 +1,7 @@
 package org.scao.samplejava;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Date: 3/20/14
@@ -9,7 +10,7 @@ import java.util.List;
 public class Employee extends Person{
     private String dob;
     private List<String> titles;
-    private List<Role> roles;
+    private Set<Role> roles;
     private Address primaryAddress;
 
 
@@ -29,11 +30,11 @@ public class Employee extends Person{
         this.titles = titles;
     }
 
-    public List<Role> getRoles() {
+    public Set<Role> getRoles() {
         return roles;
     }
 
-    public void setRoles(List<Role> roles) {
+    public void setRoles(Set<Role> roles) {
         this.roles = roles;
     }
 
