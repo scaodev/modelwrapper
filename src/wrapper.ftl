@@ -52,6 +52,32 @@ public class ${className} <#if super??>extends ${super}</#if>{
         }
         </#if>
         </#if>
+        <#if g.isCollection>
+        this.${g.internalRefFieldName} = new ${g.collectionImplType}<>();
+        <#if g.collectionImplType == 'ArrayList' || g.collectionImplType == 'HashSet'>
+        for(${g.sourceClass} v : refVal.${g.retMethod}()){
+            <#if g.genericTypeIsGenerated>
+            this.${g.internalRefFieldName}.add(new ${g.genericTypes[0]}(v));
+            <#else>
+            this.${g.internalRefFieldName}.add(v);
+            </#if>
+        }
+        <#else>
+        for (Map.Entry<${g.mapKeyTypeSourceFullName}, ${g.mapValueTypeSourceFullName}> entry : refVal.${g.retMethod}().entrySet()) {
+            <#if g.mapKeyTypeIsGenerated>
+            ${g.mapKeyType} key = new ${g.mapKeyType}(entry.getKey());
+            <#else>
+            ${g.mapKeyType} key = entry.getKey();
+            </#if>
+            <#if g.mapValueTypeIsGenerated>
+            ${g.mapValueType} value = new ${g.mapValueType}(entry.getValue());
+            <#else>
+            ${g.mapValueType} value = entry.getValue();
+            </#if>
+            this.${g.internalRefFieldName}.put(key, value);
+        }
+        </#if>
+        </#if>
         </#list>
     }
 
