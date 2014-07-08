@@ -108,7 +108,7 @@ def analystClass(Class clazz, p, opt, basePath) {
   }
 
   Class superClass = clazz.superclass
-  if (superClass.simpleName != 'Object') {
+  if (superClass != null && superClass.simpleName != 'Object') {
     retVal.put('super', superClass.simpleName)
   }
   return retVal
