@@ -44,9 +44,9 @@ public class ${className} <#if super??>extends ${super}</#if>{
     }
 </#if>
 <#elseif g.genericTypeIsGenerated>
-        this.${g.internalRefFieldName} = new ${g.retType}(val.${g.retMethod}());
+    this.${g.internalRefFieldName} = new ${g.retType}(val.${g.retMethod}());
 <#else>
-        this.${g.internalRefFieldName} = val.${g.retMethod}();
+    this.${g.internalRefFieldName} = val.${g.retMethod}();
 </#if>
 </#list>
   }

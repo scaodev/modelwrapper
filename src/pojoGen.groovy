@@ -40,7 +40,7 @@ packageMapping.load(new FileInputStream(new File(opt.c)))
 
 this.class.classLoader.rootLoader.addURL(new URL("file://${jarPath}"))
 
-File basePath = makeTargetPath(opt.t, opt.b)
+File basePath = new File(opt.t)
 
 if (opt.f) {
   basePath.listFiles().each { file -> file.delete() }
@@ -51,7 +51,7 @@ JarFile jarFile = new JarFile(opt.j)
 jarFile.entries().each { entry ->
   if (entry.name.endsWith(".class")) {
     Class clazz = Class.forName(toClassName(entry.name))
-    generate(clazz, opt, basePath)
+    generate(clazz, opt, basePath, packageMapping)
   }
 }
 
@@ -60,11 +60,15 @@ def toClassName(String name){
 }
 
 
-private void generate(Class<?> clazz, OptionAccessor opt, File basePath) {
-  def root = analystClass(clazz, opt.b, opt, basePath)
+
+
+
+private void generate(Class<?> clazz, OptionAccessor opt, File basePath, packageMapping) {
+  def targetPackage = preparePackage(clazz, basePath, packageMapping)
+  def root = analystClass(clazz, targetPackage.package, opt, basePath, packageMapping)
   //todo refactor this, no necessary passing parameters which might not be used
 
-  File outFile = new File(basePath, "${clazz.simpleName}.java")
+  File outFile = new File(targetPackage.parentDir, "${clazz.simpleName}.java")
 
   if (outFile.exists()) {
     println("${outFile.getName()} already exist. generate ignored")
@@ -76,13 +80,18 @@ private void generate(Class<?> clazz, OptionAccessor opt, File basePath) {
   writeToOutput(root, new OutputStreamWriter(new FileOutputStream(outFile)))
 }
 
-def preparePackage(clazz){
-
+def preparePackage(clazz, basePath, packageMapping) {
+  def targetPackage = packageMapping.get(clazz.package.name)
+  if(!targetPackage){
+    throw new RuntimeException("no such folder ${clazz.package.name}")
+  }
+  def dir = makeTargetPath(basePath.getPath(), targetPackage)
+  [package: targetPackage, parentDir: dir]
 }
 
 
 //this method generate getter and setter, import statement...
-def analystClass(Class clazz, p, opt, basePath) {
+def analystClass(Class clazz, p, opt, basePath, packageMapping) {
   def getters = []
   def imports = [] as HashSet
   def currentFieldName = "refVal"
@@ -93,25 +102,30 @@ def analystClass(Class clazz, p, opt, basePath) {
   //bean info return all methods including inherited from parent. but we don't need them here
   //BeanInfo beanInfo = Introspector.getBeanInfo(clazz)
   //beanInfo.methodDescriptors.each { md ->
-  clazz.declaredMethods.each { method ->
-    if (isGetter(method)) {
-      Map methodAnalystResult = analystGetter(clazz, method.name, p)
-      methodAnalystResult += [methodName: method.name, retMethod: method.name, sourceClass: methodAnalystResult.newFieldClass?.name,
-      setterName: toSetter(method.name)]
+  if(!clazz.isEnum()){
 
-      imports.addAll(methodAnalystResult.imports)
+    clazz.declaredMethods.each { method ->
+      if (isGetter(method)) {
+        Map methodAnalystResult = analystGetter(clazz, method.name, p)
+        methodAnalystResult += [methodName: method.name, retMethod: method.name, sourceClass: methodAnalystResult.newFieldClass?.name,
+                                setterName: toSetter(method.name)]
 
-      if (methodAnalystResult.genericTypeIsGenerated) {
-        generate(methodAnalystResult.newFieldClass, opt, basePath)
-        initFields.add([name  : methodAnalystResult.retField, typeName: methodAnalystResult.newFieldClass.simpleName,
-                        getter: method.name])
+        imports.addAll(methodAnalystResult.imports)
+
+        if (methodAnalystResult.genericTypeIsGenerated) {
+          if(methodAnalystResult.newFieldClass.name.indexOf('NavigationMenuItem') != -1){
+            return;
+          }
+          generate(methodAnalystResult.newFieldClass, opt, basePath, packageMapping)
+          initFields.add([name  : methodAnalystResult.retField, typeName: methodAnalystResult.newFieldClass.simpleName,
+                          getter: method.name])
+        }
+        getters.push(methodAnalystResult)
       }
-      getters.push(methodAnalystResult)
     }
   }
-
   Class superClass = clazz.superclass
-  if (superClass.simpleName != 'Object') {
+  if (superClass != null && superClass.simpleName != 'Object') {
     retVal.put('super', superClass.simpleName)
   }
   return retVal
@@ -135,7 +149,12 @@ def analystGetter(Class clazz, String methodName, String currentPackage) {
   } else {
     return [:]
   }
-  Field field = clazz.getDeclaredField(fieldName)
+  Field field;
+  try{
+    field = clazz.getDeclaredField(fieldName)
+  }catch(NoSuchFieldException e){
+    field = clazz.getDeclaredField("_${fieldName}");
+  }
   String fieldTypeLong = field.type.name
 
   def retVal = [isCollection        : false, fundamentalType: false, genericTypeIsGenerated: false, imports: [], newField: 'ref',
