@@ -94,7 +94,6 @@ def preparePackage(clazz, basePath, packageMapping) {
 def analystClass(Class clazz, p, opt, basePath, packageMapping) {
   def getters = []
   def imports = [] as HashSet
-  def currentFieldName = "refVal"
   def initFields = []
   Map retVal = [package          : p, className: genTargetClassName(clazz), sourceClass: clazz.name, getters: getters,
                  imports: imports, initFields: initFields]
@@ -106,7 +105,7 @@ def analystClass(Class clazz, p, opt, basePath, packageMapping) {
 
     clazz.declaredMethods.each { method ->
       if (isGetter(method)) {
-        Map methodAnalystResult = analystGetter(clazz, method.name, p)
+        Map methodAnalystResult = analystGetter(clazz, method.name, p, packageMapping)
         methodAnalystResult += [methodName: method.name, retMethod: method.name, sourceClass: methodAnalystResult.newFieldClass?.name,
                                 setterName: toSetter(method.name)]
 
@@ -140,7 +139,7 @@ private boolean isGetter(Method method) {
   (method.name.startsWith("get") && method.name != 'getClass') || method.name.startsWith("is")
 }
 
-def analystGetter(Class clazz, String methodName, String currentPackage) {
+def analystGetter(Class clazz, String methodName, String currentPackage, Properties packagMapping) {
   String fieldName;
   if (methodName.startsWith('get')) {
     fieldName = methodName.substring(3, 4).toLowerCase() + methodName.substring(4, methodName.length())
@@ -197,7 +196,7 @@ def analystGetter(Class clazz, String methodName, String currentPackage) {
   } else if (isTypeGenerated(clazz, field.type)) {
     retVal += [retType: field.type.simpleName, newFieldClass: field.type, genericTypeIsGenerated: isTypeGenerated(clazz, field.type)]
   } else {
-    retVal += [retType: field.type.simpleName, imports: findImports(fieldTypeLong, currentPackage), fundamentalType: true]
+    retVal += [retType: field.type.simpleName, imports: findImports(fieldTypeLong, currentPackage, packagMapping), fundamentalType: true]
   }
   return retVal
 
@@ -211,12 +210,24 @@ private boolean isTypeGenerated(Class clazz, Type type) {
   clazz.package.name.startsWith(getTypePackageName(type))
 }
 
-def findImports(String fieldTypeLong, String currentPackage) {
+def findImports(String fieldTypeLong, String currentPackage, packageMapping) {
   //Array start with [ character
   if (fieldTypeLong.startsWith("java.lang") || fieldTypeLong.startsWith(currentPackage) || fieldTypeLong.startsWith('[')) {
     []
   } else {
-    [fieldTypeLong]
+    def lastIndex = fieldTypeLong.lastIndexOf(".");
+    if(lastIndex > 0){
+      def packageFullPath = fieldTypeLong.substring(0, lastIndex)
+      def classShortName = fieldTypeLong.substring(lastIndex);
+
+      def val = packageMapping.get(packageFullPath) != null ? "${packageMapping.get(packageFullPath)}${classShortName}": fieldTypeLong;
+
+      [val]
+    }else{
+      [fieldTypeLong]
+    }
+
+
   }
 }
 
