@@ -125,6 +125,9 @@ def analystClass(Class clazz, p, opt, basePath, packageMapping) {
   }
   Class superClass = clazz.superclass
   if (superClass != null && superClass.simpleName != 'Object') {
+    if(packageMapping.get(superClass.package.name) != null){
+      retVal.imports.add("${packageMapping.get(superClass.package.name)}.${superClass.simpleName}")
+    }
     retVal.put('super', superClass.simpleName)
   }
   return retVal
