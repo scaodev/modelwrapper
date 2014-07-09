@@ -76,16 +76,19 @@ private void generate(Class<?> clazz, OptionAccessor opt, File basePath) {
   writeToOutput(root, new OutputStreamWriter(new FileOutputStream(outFile)))
 }
 
+def preparePackage(clazz){
+
+}
+
 
 //this method generate getter and setter, import statement...
 def analystClass(Class clazz, p, opt, basePath) {
   def getters = []
   def imports = [] as HashSet
   def currentFieldName = "refVal"
-  def privateWrapFields = [[type: clazz.name, name: currentFieldName]]
   def initFields = []
   Map retVal = [package          : p, className: genTargetClassName(clazz), sourceClass: clazz.name, getters: getters,
-                privateWrapFields: privateWrapFields, imports: imports, initFields: initFields]
+                 imports: imports, initFields: initFields]
 
   //bean info return all methods including inherited from parent. but we don't need them here
   //BeanInfo beanInfo = Introspector.getBeanInfo(clazz)
@@ -108,7 +111,7 @@ def analystClass(Class clazz, p, opt, basePath) {
   }
 
   Class superClass = clazz.superclass
-  if (superClass != null && superClass.simpleName != 'Object') {
+  if (superClass.simpleName != 'Object') {
     retVal.put('super', superClass.simpleName)
   }
   return retVal
@@ -136,7 +139,7 @@ def analystGetter(Class clazz, String methodName, String currentPackage) {
   String fieldTypeLong = field.type.name
 
   def retVal = [isCollection        : false, fundamentalType: false, genericTypeIsGenerated: false, imports: [], newField: 'ref',
-                internalRefFieldName: '_' + fieldName, mapValueTypeIsGenerated: false]
+                internalRefFieldName: '_' + fieldName, mapValueTypeIsGenerated: false, fieldName: fieldName]
 
   if (isOneGenericTypeCollection(field)) {
     retVal.isCollection = true;
