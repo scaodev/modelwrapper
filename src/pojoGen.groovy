@@ -83,7 +83,7 @@ private void generate(Class<?> clazz, OptionAccessor opt, File basePath, package
 def preparePackage(clazz, basePath, packageMapping) {
   def targetPackage = packageMapping.get(clazz.package.name)
   if(!targetPackage){
-    throw new RuntimeException("no such folder ${clazz.package.name}")
+    throw new RuntimeException("no such folder +${clazz.name}")
   }
   def dir = makeTargetPath(basePath.getPath(), targetPackage)
   [package: targetPackage, parentDir: dir]
@@ -197,7 +197,7 @@ def analystGetter(Class clazz, String methodName, String currentPackage, Propert
                mapValueTypeSourceFullName: type.actualTypeArguments[1].name]
 
   } else if (isTypeGenerated(clazz, field.type)) {
-    retVal += [retType: field.type.simpleName, newFieldClass: field.type, genericTypeIsGenerated: isTypeGenerated(clazz, field.type)]
+    retVal += [retType: field.type.simpleName, newFieldClass: field.type, genericTypeIsGenerated: true]
   } else {
     retVal += [retType: field.type.simpleName, imports: findImports(fieldTypeLong, currentPackage, packagMapping), fundamentalType: true]
   }
@@ -210,8 +210,19 @@ private boolean genericTypeIsGenerated(Class clazz, ParameterizedType type) {
 }
 
 private boolean isTypeGenerated(Class clazz, Type type) {
-  clazz.package.name.startsWith(getTypePackageName(type))
+  clazz.package.name.startsWith('com.rccl.esl') && getTypePackageName(type).startsWith('com.rccl.esl')
 }
+
+def getTypePackageName(Type type) {
+  if (type.toString().startsWith('class')) {
+    String s = type.toString().split(' ')[1]
+    s.substring(0, s.lastIndexOf('.'))
+  }else {
+    type.toString()
+  }
+
+}
+
 
 def findImports(String fieldTypeLong, String currentPackage, packageMapping) {
   //Array start with [ character
@@ -229,8 +240,6 @@ def findImports(String fieldTypeLong, String currentPackage, packageMapping) {
     }else{
       [fieldTypeLong]
     }
-
-
   }
 }
 
@@ -240,15 +249,6 @@ def getTypeSimpleName(Type type) {
   s.substring(s.lastIndexOf(".") + 1)
 }
 
-def getTypePackageName(Type type) {
-  if (type.toString().startsWith('class')) {
-    String s = type.toString().split(' ')[1]
-    s.substring(0, s.lastIndexOf('.'))
-  }else {
-    type.toString()
-  }
-
-}
 
 def isOneGenericTypeCollection(Field field) {
   //check if is subClass of

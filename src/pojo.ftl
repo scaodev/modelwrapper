@@ -13,6 +13,17 @@ public class ${className} <#if super??>extends ${super}</#if>{
   private ${g.retType} ${g.internalRefFieldName};
 </#list>
 
+  public ${className}(){
+<#list getters as g>
+    <#if g.isCollection>
+    this.${g.internalRefFieldName} = new ${g.collectionImplType}<>();
+    <#elseif g.genericTypeIsGenerated>
+    this.${g.internalRefFieldName} = new ${g.retType}(val.${g.retMethod}());
+    <#else>
+    </#if>
+</#list>
+}
+
   public ${className}(${sourceClass} val){
 <#if super??>
     super(val);
