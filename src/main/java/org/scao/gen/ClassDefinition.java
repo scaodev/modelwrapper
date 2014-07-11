@@ -13,6 +13,7 @@ public class ClassDefinition {
   private String fullPackage;
   private List<String> imports = new ArrayList<>();
   private List<Field> fields = new ArrayList<>();
+  private List<ClassDefinition> inners = new ArrayList<>();
 
   public boolean isEnumm() {
     return enumm;
@@ -40,6 +41,14 @@ public class ClassDefinition {
 
   public void setEnumm(boolean enumm) {
     this.enumm = enumm;
+  }
+
+  public void addInner(ClassDefinition definition) {
+    inners.add(definition);
+  }
+
+  public List<ClassDefinition> getInners() {
+    return new ArrayList<>(inners);
   }
 
   public void setInner(boolean inner) {

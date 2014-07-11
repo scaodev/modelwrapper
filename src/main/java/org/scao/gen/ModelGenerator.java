@@ -2,13 +2,15 @@ package org.scao.gen;
 
 import freemarker.template.*;
 
+import javax.swing.text.html.Option;
 import java.io.*;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.function.Consumer;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.*;
 import java.util.function.Function;
+import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 /**
@@ -18,8 +20,9 @@ import java.util.jar.JarFile;
 public class ModelGenerator {
   private final File targetPath;
   private final Properties packageMapping;
-  private final JarFile jarFile;
+  private final String jarFilePath;
   private final String templatePath;
+  private final Set<String> classNames = new HashSet<String>();
 
 
   public void writeToFile(String filePath, Function<Writer, Optional<Exception>> cloure)
@@ -68,13 +71,20 @@ public class ModelGenerator {
     };
   }
 
-  public ModelGenerator(File targetPath, Properties packageMapping, JarFile jarFile,
+  public ModelGenerator(File targetPath, Properties packageMapping, String jarFile,
     String templatePath) {
     this.targetPath = targetPath;
     this.packageMapping = packageMapping;
-    this.jarFile = jarFile;
+    this.jarFilePath = jarFile;
     this.templatePath = templatePath;
   }
+
+  public void generate() throws Exception{
+    emptyTree();
+    gatherClassesInfoFromJar();
+  }
+
+
 
   public static void main(String args[]) throws Exception {
     Builder b = new Builder();
@@ -86,7 +96,53 @@ public class ModelGenerator {
         .setTemplatePath("/Users/scao/projects/model-wrapper/src/resources")
         .build();
 
+    generator.generate();
+  }
 
+  private List<ClassDefinition> gatherClassesInfoFromJar() throws Exception {
+    URLClassLoader classLoader =
+      new URLClassLoader(new URL[]{new URL("file://" + jarFilePath)}, this.getClass().getClassLoader());
+    JarFile jarFile = new JarFile(jarFilePath);
+    jarFile.stream().filter((final JarEntry entry) -> entry.getName().endsWith(".class"))
+      .map(loadClass)
+      .forEach((final Optional<Class> clazz) -> {
+      clazz.ifPresent(c -> System.out.println(c.getPackage().getName()));
+    });
+    return null;
+  }
+
+  private Function<JarEntry, Optional<Class>> loadClass =
+    (final JarEntry entry) -> {
+      try {
+        return Optional.of(Class.forName(jarEntry2ClassName(entry)));
+      }catch (ClassNotFoundException e) {
+        e.printStackTrace();
+        return Optional.empty();
+      }
+    };
+
+  private String jarEntry2ClassName(JarEntry entry) {
+    String name = entry.getName();
+    return name.substring(0, name.lastIndexOf(".")).replace("/", ".");
+  }
+
+  private void emptyTree() throws IOException {
+    Path directory = Paths.get(targetPath.getAbsolutePath());
+    Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
+      @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+        throws IOException {
+        Files.delete(file);
+        return FileVisitResult.CONTINUE;
+      }
+
+      @Override public FileVisitResult postVisitDirectory(Path dir, IOException exc)
+        throws IOException {
+        if (!dir.toString().equals(targetPath.getAbsolutePath())) {
+          Files.delete(dir);
+        }
+        return FileVisitResult.CONTINUE;
+      }
+    });
   }
 
 
@@ -94,7 +150,7 @@ public class ModelGenerator {
   public static class Builder {
     private File targetPath;
     private Properties packageMapping;
-    private JarFile jarFile;
+    private String jarFile;
     private String templatePath;
 
     public Builder setTargetPath(File targetPath) {
@@ -114,7 +170,7 @@ public class ModelGenerator {
     }
 
     public Builder setJarFile(String jarFilePath) throws IOException {
-      this.jarFile = new JarFile(jarFilePath);
+      this.jarFile = jarFilePath;
       return this;
     }
 
