@@ -1,1 +1,1 @@
-package ${fullPackage};
+package ${targetPackage};
