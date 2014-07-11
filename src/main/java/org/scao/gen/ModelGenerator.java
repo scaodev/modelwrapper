@@ -32,8 +32,8 @@ public class ModelGenerator {
   public void writeToFile(ClassDefinition classDefinition,
     Function<Writer, Optional<Exception>> cloure)
     throws IOException {
-    File outFile = createTargetClassFile(classDefinition.getTargetPackage(), classDefinition.getTargetClassName());
-    System.out.println(outFile.getAbsolutePath());
+    File outFile = createTargetClassFile(classDefinition.getTargetPackage(),
+      classDefinition.getTargetClassName());
     FileWriter writer = new FileWriter(outFile);
     cloure.apply(writer).ifPresent(e -> e.printStackTrace());
     writer.flush();
@@ -41,7 +41,7 @@ public class ModelGenerator {
   }
 
   public File createTargetClassFile(String packagePath, String className) {
-    File targetFolder = new File(targetPath,  packagePath.replace(".", "/"));
+    File targetFolder = new File(targetPath, packagePath.replace(".", "/"));
     if (!targetFolder.exists()) {
       targetFolder.mkdirs();
     }
@@ -99,18 +99,21 @@ public class ModelGenerator {
       new URLClassLoader(new URL[] {new URL("file://" + jarFilePath)},
         this.getClass().getClassLoader());
     JarFile jarFile = new JarFile(jarFilePath);
-    List<Optional<ClassDefinition>> definitions = jarFile.stream()
+    List<ClassDefinition> definitions = jarFile.stream()
       .filter((final JarEntry entry) -> entry.getName().endsWith(".class"))
-      .filter((final JarEntry entry) -> jarEntry2Class(entry).getEnclosingClass() == null)
-      .map(loadClass()).collect(Collectors.toList());
-    definitions.forEach(opt -> {
-      if (opt.isPresent()) {
-        try {
-          writeToFile(opt.get(), createWriter(opt.get(), "pojov8.ftl"));
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
-
+      .map(this::jarEntry2Class)
+      .filter(clazz -> !clazz.isEnum())
+      .filter(clazz -> clazz.getEnclosingClass() == null)
+      .map(clazz -> {
+        ClassDefinition cd = new ClassDefinition(packageMapping);
+        cd.setClass(clazz);
+        return cd;
+      }).collect(Collectors.toList());
+    definitions.forEach(definition -> {
+      try {
+        writeToFile(definition, createWriter(definition, "pojov8.ftl"));
+      } catch (IOException e) {
+        e.printStackTrace();
       }
     });
   }

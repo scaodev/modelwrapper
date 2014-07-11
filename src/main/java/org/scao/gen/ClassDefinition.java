@@ -1,5 +1,6 @@
 package org.scao.gen;
 
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +15,7 @@ public class ClassDefinition {
   private boolean inner;
   private boolean inherited;
   private boolean concrete;
+  private String modifier;
   private String targetPackage;
   private List<String> imports = new ArrayList<>();
   private List<Field> fields = new ArrayList<>();
@@ -35,8 +37,24 @@ public class ClassDefinition {
 
     superClass = genSuperClass(clazz);
 
+    concrete = determineIsAbstract(clazz);
 
+    modifier = getModifier(clazz);
   }
+
+  private String getModifier(Class clazz) {
+    if (Modifier.isProtected(clazz.getModifiers())) {
+      return "protected";
+    }else {
+      return "public";
+    }
+  }
+
+  private boolean determineIsAbstract(Class clazz) {
+    return !Modifier.isAbstract(clazz.getModifiers());
+  }
+
+
 
   private String genSuperClass(Class clazz) {
     Class sup = clazz.getSuperclass();
@@ -48,9 +66,10 @@ public class ClassDefinition {
   }
 
   private Optional<String> getImport(Class clazz) {
-    String p = clazz.getPackage().toString();
+    String p = packageNameOfClass(clazz);
     String map = (String) packageMapping.get(p);
     if (map != null && !map.equals(targetPackage)) {
+      System.out.println(map);
       return Optional.of(map + "." + clazz.getSimpleName());
     }
     if (!p.startsWith("java.lang")) {
@@ -60,7 +79,7 @@ public class ClassDefinition {
   }
 
   private String genFullPackage(Class clazz) {
-    String sourcePackage = clazz.getPackage().getName();
+    String sourcePackage = packageNameOfClass(clazz);
     if (packageMapping.containsKey(sourcePackage)) {
       return packageMapping.getProperty(sourcePackage);
     } else {
@@ -68,6 +87,10 @@ public class ClassDefinition {
     }
   }
 
+  private String packageNameOfClass(Class clazz) {
+    String s = clazz.getPackage().getName();
+    return s.substring(s.indexOf(" ") + 1);
+  }
   public boolean isEnumm() {
     return enumm;
   }
@@ -100,10 +123,6 @@ public class ClassDefinition {
 
   public boolean isConcrete() {
     return concrete;
-  }
-
-  public void setConcrete(boolean concrete) {
-    this.concrete = concrete;
   }
 
   public String getSuperClass() {
@@ -141,4 +160,9 @@ public class ClassDefinition {
   public String getTargetClassName() {
     return targetClassName;
   }
+
+  public String getModifier() {
+    return modifier;
+  }
+
 }
