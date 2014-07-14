@@ -29,7 +29,7 @@ public class ModelGenerator {
     (opt) -> opt.isPresent() ? !opt.get().isEnum() && opt.get().getEnclosingClass() == null : true;
 
 
-  public void writeToFile(ClassDefinition classDefinition,
+  public void writeToFile(AbstractClass classDefinition,
     Function<Writer, Optional<Exception>> cloure)
     throws IOException {
     File outFile = createTargetClassFile(classDefinition.getTargetPackage(),
@@ -48,7 +48,7 @@ public class ModelGenerator {
     return new File(targetFolder, className + ".java");
   }
 
-  public Function<Writer, Optional<Exception>> createWriter(final ClassDefinition clazz,
+  public Function<Writer, Optional<Exception>> createWriter(final Object clazz,
     String templateName)
     throws IOException {
     return (final Writer out) -> {
@@ -101,6 +101,7 @@ public class ModelGenerator {
     JarFile jarFile = new JarFile(jarFilePath);
     List<ClassDefinition> definitions = jarFile.stream()
       .filter((final JarEntry entry) -> entry.getName().endsWith(".class"))
+      .filter(entry -> !entry.getName().contains("package-info"))
       .map(this::jarEntry2Class)
       .filter(clazz -> !clazz.isEnum())
       .filter(clazz -> clazz.getEnclosingClass() == null)
@@ -114,6 +115,24 @@ public class ModelGenerator {
         writeToFile(definition, createWriter(definition, "pojov8.ftl"));
       } catch (IOException e) {
         e.printStackTrace();
+      }
+    });
+
+
+    List<EnumDifinition> enums = jarFile.stream()
+      .filter((final JarEntry entry) -> entry.getName().endsWith(".class"))
+      .map(this::jarEntry2Class)
+      .filter(clazz -> clazz.isEnum())
+      .map(clazz -> {
+        EnumDifinition cd = new EnumDifinition(packageMapping);
+        cd.setClass(clazz);
+        return cd;
+      }).collect(Collectors.toList());
+    enums.forEach(e -> {
+      try {
+        writeToFile(e, createWriter(e, "enum.ftl"));
+      } catch (IOException exp) {
+        exp.printStackTrace();
       }
     });
   }
